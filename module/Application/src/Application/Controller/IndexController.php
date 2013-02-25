@@ -51,7 +51,8 @@ class IndexController extends AbstractActionController
         $repositories = $mapper->pagination($page, 15, null, 'created_at', 'DESC');
 
         // Load them into the feed
-        foreach ($repositories as $module) {
+        foreach ($repositories as $module)
+        {
             $entry = $feed->createEntry();
             $entry->setTitle($module->getName());
             $entry->setDescription($module->getDescription());
