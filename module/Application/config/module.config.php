@@ -44,6 +44,16 @@ return array(
                     ),
                 )
             ),
+            'feed' => array(
+                'type' => 'Literal',
+                'options' => array(
+                    'route' => '/feed',
+                    'defaults' => array(
+                        'controller' => 'Application\Controller\Index',
+                        'action' => 'feed',
+                    ),
+                ),
+            ),
             // The following is a route to simplify getting started creating
             // new controllers and actions without needing to create a new
             // module. Simply drop new controllers in, and you can access them
@@ -122,6 +132,9 @@ return array(
         'template_path_stack' => array(
             __DIR__ . '/../view',
         ),
+	    'strategies' => array(
+		    'ViewFeedStrategy',
+	    ),
     ),
     'view_helpers' => array(
         'factories' => array(
