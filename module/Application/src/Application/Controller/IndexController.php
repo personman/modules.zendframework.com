@@ -33,7 +33,7 @@ class IndexController extends AbstractActionController
     }
 
     /**
-     * RSS feed for recently added modules
+     * RSS feed for recently added modules.
      * @return FeedModel
      */
     public function feedAction()
