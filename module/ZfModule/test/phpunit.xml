@@ -12,8 +12,8 @@
         backupGlobals="false"
         syntaxCheck="true"
         >
-    <testsuite name="ApplicationTest">
-        <directory>./ApplicationTest</directory>
+    <testsuite name="ZfModuleTest">
+        <directory>./ZfModuleTest</directory>
     </testsuite>
     <filter>
         <whitelist addUncoveredFilesFromWhitelist="true">
