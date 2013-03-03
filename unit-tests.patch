@@ -1,0 +1,356 @@
+diff --git a/Bootstrap.php b/Bootstrap.php
+index 4fc5780..279ff1e 100644
+--- a/Bootstrap.php
++++ b/Bootstrap.php
+@@ -1,5 +1,5 @@
+ <?php
+-namespace EdpGithubTest;
++namespace ApplicationTest;
+ 
+ use Zend\Loader\AutoloaderFactory;
+ use Zend\Mvc\Service\ServiceManagerConfig;
+diff --git a/module/Application/src/Application/Controller/IndexController.php b/module/Application/src/Application/Controller/IndexController.php
+index 577ef41..0c80522 100644
+--- a/module/Application/src/Application/Controller/IndexController.php
++++ b/module/Application/src/Application/Controller/IndexController.php
+@@ -19,7 +19,6 @@ class IndexController extends AbstractActionController
+         $query =  $this->params()->fromQuery('query', null);
+ 
+         $page = (int) $this->params()->fromRoute('page', 1);
+-        $sm = $this->getServiceLocator();
+         $mapper = $this->getServiceLocator()->get('zfmodule_mapper_module');
+ 
+         $repositories = $mapper->pagination($page, 15, $query, 'created_at', 'DESC');
+diff --git a/module/Application/test/ApplicationTest/Controller/IndexControllerTest.php b/module/Application/test/ApplicationTest/Controller/IndexControllerTest.php
+new file mode 100644
+index 0000000..134a2c3
+--- /dev/null
++++ b/module/Application/test/ApplicationTest/Controller/IndexControllerTest.php
+@@ -0,0 +1,47 @@
++<?php
++
++namespace ApplicationTest\Controller;
++
++use ApplicationTest\Bootstrap;
++use Application\Controller\IndexController;
++use Zend\Http\Request;
++use Zend\Http\Response;
++use Zend\Mvc\MvcEvent;
++use Zend\Mvc\Router\RouteMatch;
++use Zend\Mvc\Router\Http\TreeRouteStack as HttpRouter;
++use PHPUnit_Framework_TestCase;
++
++class ApplicationControllerTest extends PHPUnit_Framework_TestCase
++{
++    protected $controller;
++    protected $request;
++    protected $response;
++    protected $routeMatch;
++    protected $event;
++
++    protected function setUp()
++    {
++        $serviceManager = Bootstrap::getServiceManager();
++        $this->controller = new IndexController();
++        $this->request = new Request();
++        $this->routeMatch = new RouteMatch(array('controller' => 'index'));
++        $this->event = new MvcEvent();
++        $config = $serviceManager->get('Config');
++        $routerConfig = isset($config['router']) ? $config['router'] : array();
++        $router = HttpRouter::factory($routerConfig);
++        $this->event->setRouter($router);
++        $this->event->setRouteMatch($this->routeMatch);
++        $this->controller->setEvent($this->event);
++        $this->controller->setServiceLocator($serviceManager);
++    }
++
++    public function testIndexActionCanBeAccessed()
++    {
++        $this->routeMatch->setParam('action', 'index');
++
++        //$result = $this->controller->dispatch($this->request);
++        //$response = $this->controller->getResponse();
++
++        //$this->assertEquals(200, $response->getStatusCode());
++    }
++}
+diff --git a/module/Application/test/TestConfig.php.dist b/module/Application/test/TestConfig.php.dist
+index 8ccfd40..5290410 100644
+--- a/module/Application/test/TestConfig.php.dist
++++ b/module/Application/test/TestConfig.php.dist
+@@ -3,6 +3,8 @@ return array(
+     'modules' => array(
+         'EdpGithub',
+         'Application',
++        'ZfModule',
++        'ZfcBase',
+     ),
+     'module_listener_options' => array(
+         'module_paths' => array(
+diff --git a/module/Application/test/phpunit.xml b/module/Application/test/phpunit.xml
+index 3672862..8f83cc4 100644
+--- a/module/Application/test/phpunit.xml
++++ b/module/Application/test/phpunit.xml
+@@ -12,7 +12,7 @@
+         backupGlobals="false"
+         syntaxCheck="true"
+         >
+-    <testsuite name="EdpGithub Module Tests">
++    <testsuite name="ApplicationTest">
+         <directory>./ApplicationTest</directory>
+     </testsuite>
+     <filter>
+diff --git a/module/ZfModule/test/Bootstrap.php b/module/ZfModule/test/Bootstrap.php
+new file mode 100644
+index 0000000..d2d2b90
+--- /dev/null
++++ b/module/ZfModule/test/Bootstrap.php
+@@ -0,0 +1,108 @@
++<?php
++namespace ApplicationTest;
++
++use Zend\Loader\AutoloaderFactory;
++use Zend\Mvc\Service\ServiceManagerConfig;
++use Zend\ServiceManager\ServiceManager;
++use Zend\Stdlib\ArrayUtils;
++use RuntimeException;
++
++error_reporting(E_ALL | E_STRICT);
++chdir(__DIR__);
++
++class Bootstrap
++{
++    protected static $serviceManager;
++
++    public static function init()
++    {
++        // Load the user-defined test configuration file, if it exists; otherwise, load
++        if (is_readable(__DIR__ . '/TestConfig.php')) {
++            $testConfig = include __DIR__ . '/TestConfig.php';
++        } else {
++            $testConfig = include __DIR__ . '/TestConfig.php.dist';
++        }
++
++        $zf2ModulePaths = array(dirname(dirname(__DIR__)));
++        if (($path = static::findParentPath('vendor'))) {
++            $zf2ModulePaths[] = $path;
++        }
++        if (($path = static::findParentPath('module')) !== $zf2ModulePaths[0]) {
++            $zf2ModulePaths[] = $path;
++        }
++
++        if(isset($testConfig['module_listener_options']['module_paths'])) {
++            $modulePaths = $testConfig['module_listener_options']['module_paths'];
++            foreach($modulePaths as $modulePath) {
++                if (($path = static::findParentPath($modulePath)) !== $zf2ModulePaths[0]) {
++                    $zf2ModulePaths[] = $path;
++                }
++            }
++        }
++
++        $zf2ModulePaths  = implode(PATH_SEPARATOR, $zf2ModulePaths) . PATH_SEPARATOR;
++        $zf2ModulePaths .= getenv('ZF2_MODULES_TEST_PATHS') ?: (defined('ZF2_MODULES_TEST_PATHS') ? ZF2_MODULES_TEST_PATHS : '');
++
++        static::initAutoloader();
++
++        // use ModuleManager to load this module and it's dependencies
++        $baseConfig = array(
++            'module_listener_options' => array(
++                'module_paths' => explode(PATH_SEPARATOR, $zf2ModulePaths),
++            ),
++        );
++
++        $config = ArrayUtils::merge($baseConfig, $testConfig);
++
++        $serviceManager = new ServiceManager(new ServiceManagerConfig());
++        $serviceManager->setService('ApplicationConfig', $config);
++        $serviceManager->get('ModuleManager')->loadModules();
++        static::$serviceManager = $serviceManager;
++    }
++
++    public static function getServiceManager()
++    {
++        return static::$serviceManager;
++    }
++
++    protected static function initAutoloader()
++    {
++        $vendorPath = static::findParentPath('vendor');
++
++        if (is_readable($vendorPath . '/autoload.php')) {
++            $loader = include $vendorPath . '/autoload.php';
++        } else {
++            $zf2Path = getenv('ZF2_PATH') ?: (defined('ZF2_PATH') ? ZF2_PATH : (is_dir($vendorPath . '/ZF2/library') ? $vendorPath . '/ZF2/library' : false));
++
++            if (!$zf2Path) {
++                throw new RuntimeException('Unable to load ZF2. Run `php composer.phar install` or define a ZF2_PATH environment variable.');
++            }
++
++            include $zf2Path . '/Zend/Loader/AutoloaderFactory.php';
++
++        }
++
++        AutoloaderFactory::factory(array(
++            'Zend\Loader\StandardAutoloader' => array(
++                'autoregister_zf' => true,
++                'namespaces' => array(
++                    __NAMESPACE__ => __DIR__ . '/' . __NAMESPACE__,
++                ),
++            ),
++        ));
++    }
++
++    protected static function findParentPath($path)
++    {
++        $dir = __DIR__;
++        $previousDir = '.';
++        while (!is_dir($dir . '/' . $path)) {
++            $dir = dirname($dir);
++            if ($previousDir === $dir) return false;
++            $previousDir = $dir;
++        }
++        return $dir . '/' . $path;
++    }
++}
++
++Bootstrap::init();
+diff --git a/module/ZfModule/test/TestConfig.php.dist b/module/ZfModule/test/TestConfig.php.dist
+new file mode 100644
+index 0000000..7bc0fd6
+--- /dev/null
++++ b/module/ZfModule/test/TestConfig.php.dist
+@@ -0,0 +1,12 @@
++<?php
++return array(
++    'modules' => array(
++        'ZfModule',
++        'ZfcBase',
++    ),
++    'module_listener_options' => array(
++        'module_paths' => array(
++            'moduledev',
++        ),
++    ),
++);
+\ No newline at end of file
+diff --git a/module/ZfModule/test/ZfModuleTest/Entity/ModuleTest.php b/module/ZfModule/test/ZfModuleTest/Entity/ModuleTest.php
+new file mode 100644
+index 0000000..e0abde8
+--- /dev/null
++++ b/module/ZfModule/test/ZfModuleTest/Entity/ModuleTest.php
+@@ -0,0 +1,80 @@
++<?php
++
++namespace ZfModuleTest\Entity;
++
++use ZfModule\Entity\Module;
++use PHPUnit_Framework_TestCase;
++
++class ModuleTest extends PHPUnit_Framework_TestCase
++{
++    protected $module;
++
++    public function setUp()
++    {
++        $this->module = new Module;
++    }
++
++    public function testModuleConstruction()
++    {
++        $this->assertInstanceOf('ZfModule\Entity\Module', $this->module);
++    }
++
++    public function testSetOwner()
++    {
++        $this->module->setOwner('johndoe');
++
++        $this->assertEquals('johndoe', $this->module->getOwner());
++    }
++
++    public function testSetId()
++    {
++        $this->module->setId(99);
++
++        $this->assertEquals(99, $this->module->getId());
++    }
++
++    public function testSetUrl()
++    {
++        $this->module->setUrl('http://example.com');
++
++        $this->assertEquals('http://example.com', $this->module->getUrl());
++    }
++
++    public function testSetName()
++    {
++        $this->module->setName('Super Great Happy Good Time Module');
++
++        $this->assertEquals('Super Great Happy Good Time Module', $this->module->getName());
++    }
++
++    public function testSetDescription()
++    {
++        $this->module->setDescription('Lorem ipsum dolor sit amet');
++
++        $this->assertEquals('Lorem ipsum dolor sit amet', $this->module->getDescription());
++    }
++
++    public function testSetCreatedAt()
++    {
++        $this->module->setCreatedAt('2013-02-28 13:05:00');
++
++        $this->assertEquals('2013-02-28 13:05:00', $this->module->getCreatedAt());
++    }
++
++    public function testSetUpdatedAt()
++    {
++        $this->module->setUpdatedAt('2013-02-28 13:05:00');
++
++        $this->assertEquals('2013-02-28 13:05:00', $this->module->getUpdatedAt());
++    }
++
++
++    public function testSetPhotoUrl()
++    {
++        $this->module->setPhotoUrl('http://www.example.com/photo.jpg');
++
++        $this->assertEquals('http://www.example.com/photo.jpg', $this->module->getPhotoUrl());
++    }
++
++
++}
+diff --git a/module/ZfModule/test/phpunit.xml b/module/ZfModule/test/phpunit.xml
+new file mode 100644
+index 0000000..ddfe764
+--- /dev/null
++++ b/module/ZfModule/test/phpunit.xml
+@@ -0,0 +1,29 @@
++<?xml version="1.0"?>
++<!-- works fine with PHPUnit-3.6.10 -->
++<phpunit
++        bootstrap="./Bootstrap.php"
++        colors="true"
++        convertErrorsToExceptions="true"
++        convertNoticesToExceptions="true"
++        convertWarningsToExceptions="true"
++        verbose="true"
++        stopOnFailure="false"
++        processIsolation="false"
++        backupGlobals="false"
++        syntaxCheck="true"
++        >
++    <testsuite name="ZfModuleTest">
++        <directory>./ZfModuleTest</directory>
++    </testsuite>
++    <filter>
++        <whitelist addUncoveredFilesFromWhitelist="true">
++            <directory suffix=".php">./src</directory>
++        </whitelist>
++    </filter>
++    <logging>
++        <log
++            type="coverage-clover"
++            target="./clover.xml"
++        />
++    </logging>
++</phpunit>
